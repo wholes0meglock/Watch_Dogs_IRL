@@ -1,6 +1,6 @@
-### UninstallSHT - Script Cleanup Tool
+### unistallsht - Script Cleanup Tool
 
-**UninstallSHT** is a Python utility designed to help you manage and clean up unused scripts and files from specified directories. This tool automatically deletes files that haven't been accessed in a specified number of days, helping you keep your file system organized and free from clutter.
+**unistallsht** is a Python utility designed to help you manage and clean up unused scripts and files from specified directories. This tool automatically deletes files that haven't been accessed in a specified number of days, helping you keep your file system organized and free from clutter.
 
 #### Features:
 - **Automated Cleanup**: Scans directories and deletes files that haven't been accessed in a user-defined number of days.
