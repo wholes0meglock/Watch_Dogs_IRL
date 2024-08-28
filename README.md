@@ -1,21 +1,19 @@
-# System: Terminal File Explorer & Script Executor for Termux (Includes Extra Tools and Not Only)
+**termux-setup-unofficial: Terminal File Explorer & Script Executor for Termux**
 
-**System** is a Python-based, terminal-focused file explorer and script executor designed specifically for the Termux environment on Android. It allows you to navigate directories, manage and edit files, and execute various scripts directly from the terminal. With built-in logging, it helps you track your actions and troubleshoot errors effectively.
+**termux-setup-unofficial** is a Python-based file explorer and script executor built specifically for the Termux environment on Android. It provides a powerful terminal interface that lets you easily navigate directories, manage and edit files, and execute scripts directly from Termux. With built-in logging, you can effortlessly track your actions and troubleshoot any issues.
 
 ### Features:
-- **Directory Navigation**: Easily browse and view the contents of directories with an intuitive, colorful interface.
-- **Script Execution**: Seamlessly run scripts written in Python, Bash, Perl, Ruby, and Node.js.
-- **File Editing**: Edit any file using Nano directly from the terminal interface.
-- **Logging**: All actions and errors are logged into a file, simplifying error tracking and management.
-- **Advanced Python Development**:
-  - **File Management**: Simplify file handling with potential Flask integration.
-  - **SQLite Database Integration**: Manage databases directly within Termux.
-  - **AES Encryption**: Secure your data with AES encryption (CBC Mode, Password-based Key Derivation).
-  - **Automation**: Automate tasks like dependency management and server control.
-  - **Games**: Execute or develop terminal-based games.
+- **Directory Navigation**: Browse and view directory contents with an intuitive, colorful interface—just by selecting numbers.
+- **Script Execution**: Run scripts directly from the folder by selecting them. Supports Python, Bash, Perl, Ruby, and Node.js.
+- **File Editing**: Edit files using Nano directly within the terminal by selecting the "nano" option and typing the file name within the current folder.
+- **File Management**: Simplify file handling with optional Flask integration.
+- **SQLite Database Integration**: Manage databases directly within Termux.
+- **AES Encryption**: Secure your data with AES encryption (CBC Mode, Password-based Key Derivation).
+- **Automation**: Automate tasks like dependency management and server control.
+- **Games**: Run or develop terminal-based games.
 
 ### Getting Started:
-To make the **System** program start automatically whenever you open Termux:
+To make **termux-setup-unofficial** start automatically whenever you open Termux:
 1. Open the bash configuration file by running:
    ```bash
    nano ../usr/etc/bash.bashrc
@@ -37,4 +35,4 @@ To make the **System** program start automatically whenever you open Termux:
 2. Run the script using Python.
 3. Use the interactive menu to navigate directories, execute scripts, or edit files.
 
-**System** is ideal for developers, system administrators, and power users looking for a powerful and easy-to-use file management and automation tool within Termux. It offers robust features for advanced Python development, including file management, database handling, encryption, automation, and even game development.
+**termux-setup-unofficial** is perfect for developers, system administrators, and power users seeking a robust file management and automation tool within Termux. Whether you need to manage files, handle databases, secure data, automate tasks, or even develop games, this tool has you covered.
