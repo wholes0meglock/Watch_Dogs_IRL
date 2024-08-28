@@ -1,5 +1,3 @@
-The provided Python script implements a Magic 8-Ball simulation, a novelty item used for fortune-telling or seeking advice. Here's what the script does and how you can use it:
-
 ### What It Does:
 1. **Imports `random`**: This module is used to generate random responses from a predefined list.
    
