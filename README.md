@@ -20,7 +20,7 @@ To make **Watch_Dogs_IRL** start automatically whenever you open Termux:
    ```
 2. Add the following lines at the end of the file:
    ```bash
-   cd termux-setup-unofficial
+   cd Watch_Dogs_IRL
    chmod +x system.py
    python system.py
    ```
