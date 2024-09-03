@@ -7,8 +7,17 @@ import logging
 import subprocess
 import sys
 
-# Configure logging
-logging.basicConfig(filename='unistallsht.log', level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+# Configure logging to print to STDOUT as well
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
+handler = logging.StreamHandler(sys.stdout)
+formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+handler.setFormatter(formatter)
+logger.addHandler(handler)
+
+file_handler = logging.FileHandler('unistallsht.log')
+file_handler.setFormatter(formatter)
+logger.addHandler(file_handler)
 
 def install_required_packages():
     """Install required packages if not already installed."""
@@ -17,9 +26,22 @@ def install_required_packages():
         try:
             __import__(package)
         except ImportError:
-            print(f"Installing {package}...")
-            subprocess.check_call([sys.executable, '-m', 'pip', 'install', package])
-            print(f"{package} installed successfully.")
+            logger.info(f"Installing {package}...")
+            try:
+                subprocess.check_call([sys.executable, '-m', 'pip', 'install', package])
+                logger.info(f"{package} installed successfully.")
+            except subprocess.CalledProcessError as e:
+                logger.error(f"Failed to install {package}: {e}")
+
+def run_command(command):
+    """Run a command using subprocess and handle errors."""
+    try:
+        result = subprocess.run(command, check=True, capture_output=True, text=True)
+        logger.info(f"Command '{' '.join(command)}' ran successfully.")
+        return result.stdout
+    except subprocess.CalledProcessError as e:
+        logger.error(f"Command '{' '.join(command)}' failed: {e.stderr}")
+        return None
 
 def get_file_modification_time(file_path):
     """Get the last modification time of a file."""
@@ -44,14 +66,12 @@ def delete_old_files(directory, threshold_days, file_types, dry_run):
                     last_access_time = get_file_modification_time(file_path)
                     if now - last_access_time > threshold_seconds:
                         if dry_run:
-                            print(f"Would delete {file_path}")
+                            logger.info(f"Would delete {file_path}")
                         else:
                             os.remove(file_path)
-                            logging.info(f"Deleted {file_path}")
-                            print(f"Deleted {file_path}")
+                            logger.info(f"Deleted {file_path}")
                 except Exception as e:
-                    logging.error(f"Error deleting {file_path}: {e}")
-                    print(f"Error deleting {file_path}: {e}")
+                    logger.error(f"Error deleting {file_path}: {e}")
 
 def parse_args():
     """Parse command-line arguments."""
@@ -62,12 +82,28 @@ def parse_args():
     parser.add_argument('--dry-run', action='store_true', help='Preview files that would be deleted without actually deleting them')
     return parser.parse_args()
 
+def clean_directory(directory, file_types, threshold_days, dry_run):
+    """Clean a specific directory after user confirmation."""
+    directory = directory.strip()
+    if not os.path.isdir(directory):
+        logger.warning(f"Directory {directory} does not exist and will be skipped.")
+        return
+
+    # Confirm directory to clean
+    if not dry_run:
+        confirm = input(f"Are you sure you want to clean the directory {directory}? (yes/no): ").strip().lower()
+        if confirm != 'yes':
+            logger.info(f"Skipping directory {directory}.")
+            return
+
+    delete_old_files(directory, threshold_days, file_types, dry_run)
+
 def main():
     install_required_packages()
 
     args = parse_args()
     if args.days <= 0:
-        print("Error: Number of days must be a positive integer.")
+        logger.error("Error: Number of days must be a positive integer.")
         return
 
     file_types = args.types.split(',')
@@ -75,25 +111,13 @@ def main():
     if not isinstance(directories, list):
         directories = directories.split(',')
 
-    print(f"Starting cleanup for files not accessed in the last {args.days} days...")
+    logger.info(f"Starting cleanup for files not accessed in the last {args.days} days...")
     
     for directory in directories:
-        directory = directory.strip()
-        if not os.path.isdir(directory):
-            print(f"Warning: Directory {directory} does not exist and will be skipped.")
-            continue
-
-        # Confirm directory to clean
-        if not args.dry_run:
-            confirm = input(f"Are you sure you want to clean the directory {directory}? (yes/no): ").strip().lower()
-            if confirm != 'yes':
-                print(f"Skipping directory {directory}.")
-                continue
-
-        delete_old_files(directory, args.days, file_types, args.dry_run)
+        clean_directory(directory, file_types, args.days, args.dry_run)
     
-    print("Cleanup completed.")
-    logging.info("Cleanup completed.")
+    logger.info("Cleanup completed.")
 
 if __name__ == "__main__":
     main()
+    
