@@ -104,7 +104,12 @@ def navigate_directory(base_dir: str, stdscr):
                 if os.path.isfile(file_path):
                     edit_file(file_path)
                 else:
-                    stdscr.addstr(len(items) + 3, 0, "File does not exist.", curses.color_pair(1))
+                    max_y, max_x = stdscr.getmaxyx()
+                    # Ensure the message is within the screen dimensions
+                    if len(items) + 3 < max_y:
+                        stdscr.addstr(len(items) + 3, 0, "File does not exist.", curses.color_pair(1))
+                    else:
+                        stdscr.addstr(max_y - 1, 0, "File does not exist.", curses.color_pair(1))
             else:
                 selected_path = os.path.join(current_dir, selected_item)
                 if os.path.isdir(selected_path):
@@ -145,3 +150,4 @@ def menu(stdscr):
 
 if __name__ == "__main__":
     curses.wrapper(menu)
+  
