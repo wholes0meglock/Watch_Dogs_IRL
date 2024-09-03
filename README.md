@@ -3,7 +3,7 @@
 **Watch_Dogs_IRL** is a Python-based file explorer and script executor built specifically for the Termux environment on Android. It provides a powerful terminal interface that lets you easily navigate directories, manage and edit files, and execute scripts directly from Termux. With built-in logging, you can effortlessly track your actions and troubleshoot any issues.
 
 ### Features:
-- **Directory Navigation**: Browse and view directory contents with an intuitive, colorful interface—just by selecting numbers.
+- **Directory Navigation**: Browse and view directory contents with an intuitive, colorful interface—just by using arrow keys.
 - **Script Execution**: Run scripts directly from the folder by selecting them. Supports Python, Bash, Perl, Ruby, and Node.js.
 - **File Editing**: Edit files using Nano directly within the terminal by selecting the "nano" option and typing the file name within the current folder.
 - **File Management**: Simplify file handling with optional Flask integration.
