@@ -1,6 +1,7 @@
 import os
 import subprocess
 from colorama import init, Fore, Style
+import curses
 
 # Initialize Colorama
 init(autoreset=True)
@@ -27,28 +28,35 @@ def log_message(message: str, level: str = 'INFO'):
 
 setup_logging()
 
-def print_header(title: str):
-    print(Fore.LIGHTWHITE_EX + Style.BRIGHT + title)
-    print(Fore.LIGHTWHITE_EX + "-" * len(title))
+def print_header(title: str, stdscr):
+    stdscr.clear()
+    stdscr.addstr(0, 0, title, curses.A_BOLD)
+    stdscr.addstr(1, 0, "-" * len(title), curses.A_BOLD)
 
-def list_folders(directory: str):
-    print_header(f"Contents of {directory}")
+def list_folders(directory: str, stdscr, selected_idx):
+    print_header(f"Contents of {directory}", stdscr)
     try:
         items = os.listdir(directory)
         if not items:
-            print(Fore.RED + "No items found.")
-            return
-        for idx, item in enumerate(items, 1):
-            item_path = os.path.join(directory, item)
-            if os.path.isdir(item_path):
-                print(f"{Fore.LIGHTGREEN_EX}{idx}. {item}/")
+            stdscr.addstr(2, 0, "No items found.", curses.color_pair(1))
+            return items
+
+        items.append("nano (Edit file with nano)")
+        items.append("Exit")
+        
+        for idx, item in enumerate(items):
+            if idx == selected_idx:
+                stdscr.addstr(idx + 2, 0, item, curses.color_pair(2) | curses.A_REVERSE)
             else:
-                print(f"{Fore.LIGHTCYAN_EX}{idx}. {item}")
-        print(f"{Fore.LIGHTCYAN_EX}{len(items) + 1}. nano (Edit file with nano)")
-        print(f"{Fore.LIGHTCYAN_EX}{len(items) + 2}. Exit")
+                stdscr.addstr(idx + 2, 0, item)
+                
+        stdscr.refresh()
+        return items
     except Exception as e:
         log_message(f"Error listing folders: {e}", 'ERROR')
-        print(Fore.RED + f"Error: {e}")
+        stdscr.addstr(2, 0, f"Error: {e}", curses.color_pair(1))
+        stdscr.refresh()
+        return []
 
 def execute_program(file_path: str):
     try:
@@ -75,57 +83,65 @@ def edit_file(file_path: str):
         log_message(f"Error editing {file_path}: {e}", 'ERROR')
         print(Fore.RED + f"Error editing {file_path}")
 
-def navigate_directory(base_dir: str):
+def navigate_directory(base_dir: str, stdscr):
     current_dir = base_dir
+    selected_idx = 0
     while True:
-        list_folders(current_dir)
-        choice = input(Fore.WHITE + "Enter the number of the folder to navigate: ").strip()
-        try:
-            items = os.listdir(current_dir)
-            nano_option = len(items) + 1
-            exit_option = len(items) + 2
-            
-            if choice.lower() == 'nano' or int(choice) == nano_option:
-                file_name = input(Fore.WHITE + "Enter the filename to edit: ").strip()
+        items = list_folders(current_dir, stdscr, selected_idx)
+        key = stdscr.getch()
+
+        if key == curses.KEY_UP and selected_idx > 0:
+            selected_idx -= 1
+        elif key == curses.KEY_DOWN and selected_idx < len(items) - 1:
+            selected_idx += 1
+        elif key == curses.KEY_ENTER or key in [10, 13]:
+            selected_item = items[selected_idx]
+            if selected_item == "Exit":
+                break
+            elif selected_item.startswith("nano"):
+                file_name = selected_item.split()[0]
                 file_path = os.path.join(current_dir, file_name)
                 if os.path.isfile(file_path):
                     edit_file(file_path)
                 else:
-                    print(Fore.RED + "File does not exist.")
-            elif int(choice) == exit_option:
-                print(Fore.LIGHTGREEN_EX + "Exiting...")
-                break
+                    stdscr.addstr(len(items) + 3, 0, "File does not exist.", curses.color_pair(1))
             else:
-                idx = int(choice)
-                if 1 <= idx <= len(items):
-                    selected_item = items[idx - 1]
-                    selected_path = os.path.join(current_dir, selected_item)
-                    if os.path.isdir(selected_path):
-                        current_dir = selected_path
-                    else:
-                        execute_program(selected_path)
+                selected_path = os.path.join(current_dir, selected_item)
+                if os.path.isdir(selected_path):
+                    current_dir = selected_path
+                    selected_idx = 0
                 else:
-                    print(Fore.RED + "Invalid choice.")
-        except ValueError:
-            print(Fore.RED + "Invalid input. Enter a number or 'nano'.")
+                    execute_program(selected_path)
+        stdscr.refresh()
 
-def display_menu():
-    print(Fore.WHITE + ASCII_ART)
-    print(Fore.LIGHTCYAN_EX + "Menu")
-    print(Fore.LIGHTCYAN_EX + "1. Navigate Folders")
-    print(Fore.LIGHTCYAN_EX + "2. Exit")
+def display_menu(stdscr):
+    stdscr.clear()
+    stdscr.addstr(0, 0, ASCII_ART)
+    stdscr.addstr(7, 0, "Menu", curses.A_BOLD)
+    stdscr.addstr(8, 0, "Navigate Folders", curses.color_pair(2) | curses.A_REVERSE)
+    stdscr.addstr(9, 0, "Exit")
+    stdscr.refresh()
 
-def menu():
+def menu(stdscr):
+    curses.start_color()
+    curses.init_pair(1, curses.COLOR_RED, curses.COLOR_BLACK)
+    curses.init_pair(2, curses.COLOR_CYAN, curses.COLOR_BLACK)
+
+    selected_idx = 0
     while True:
-        display_menu()
-        choice = input(Fore.WHITE + "Enter your choice: ").strip()
-        if choice == '1':
-            navigate_directory(BASE_DIR)
-        elif choice == '2':
-            print(Fore.LIGHTGREEN_EX + "Exiting...")
-            break
-        else:
-            print(Fore.RED + "Invalid choice. Please try again.")
+        display_menu(stdscr)
+        key = stdscr.getch()
+
+        if key == curses.KEY_UP and selected_idx > 0:
+            selected_idx -= 1
+        elif key == curses.KEY_DOWN and selected_idx < 1:
+            selected_idx += 1
+        elif key == curses.KEY_ENTER or key in [10, 13]:
+            if selected_idx == 0:
+                navigate_directory(BASE_DIR, stdscr)
+            elif selected_idx == 1:
+                break
+        stdscr.refresh()
 
 if __name__ == "__main__":
-    menu()
+    curses.wrapper(menu)
