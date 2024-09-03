@@ -7,6 +7,9 @@ import random
 import string
 import base64
 import ssl
+import sys
+import logging
+import multiprocessing
 from flask import Flask, request, redirect, url_for, send_from_directory, render_template_string
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.primitives import padding
@@ -15,8 +18,12 @@ from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from cryptography.hazmat.primitives import hashes
 from werkzeug.utils import secure_filename
 from flask_bcrypt import Bcrypt
-import sys
-import urllib.request
+from urllib.request import urlopen
+
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+console_handler = logging.StreamHandler()
+logging.getLogger().addHandler(console_handler)
 
 # Constants
 DATABASE_FILE = 'app_data.db'
@@ -24,37 +31,6 @@ UPLOAD_FOLDER = "/storage/emulated/0/Cloud"
 ALLOWED_EXTENSIONS = {'txt', 'pdf', 'png', 'jpg', 'jpeg', 'gif'}
 REPO_URL = "https://github.com/dedsec1121fk/Nothing"
 RAW_URL = "https://raw.githubusercontent.com/dedsec1121fk/Nothing/main/"
-
-# ASCII Art
-def display_ascii_art():
-    print("""
-@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-@@@@@@@@@@@@#**+::....:......=%@@@@@@@@@@@@
-@@@@@@@@@@+**+@@@%+*#=..:=++--*@@@@@@@@@@@@
-@@@@@@@@%.:-#@@@@@@%+...+..:+#@@@@@@@@@@@@@
-@@@@@@@%+@@*:+#@@@@@@#-.....-@@%@@@@@@@@@@@
-@@@@@@@%#--.+*#%@@@@#@@+:...:+%+-@@@@@@@@@@
-@@@@@@@+*@@@##*%@@%**=++@*...-=%**@@@@@@@@@
-@@@@@@%*@:..-%@@*==*+--+-*##%*:-%#@@@@@@@@@
-@@@@@@%#@=+=+:.:%@@*+#%%%#%@@%#*:-@@@@@@@@@
-@@@@@@@%@@%@@@%=:.=@@@@@@@@@@@@=.=@@@@@@@@@
-@@@@@@@%@@@@%%@@@#=::+*%%%#*+++:=@@@@@@@@@@
-@@@@@@@%@@@@@@@@@@@@%#++*#%%%%%%@@@@@@@@@@@
-@@@@@@@@#@@@@@@@@@@@@@@@@@@@@@@+%@@@@@@@@@@
-@@@@@@@@%@@@@@@@@@@@@@@@@@@@@@@#-%@@@@@@@@@
-@@@@@@@@@%@@@@@@@@@@@@@@@@@@@@@%+*#@@@@@@@@
-@@@@@@@@@%@@@@@@@@@@@@@@@@@@@@@@*@:+*@@@@@@
-@@@@@@@@@%@@@@@@@@@@@@@@@@@@@@@@#@*#*==@@@@
-@@@@@@@@*=@@@@@@@@@@@@@@@@@@@@@@@%*@@*..=@@
-@@@@@@-:+##@@@@@@@@@@@@@@@@@@@@@@%%@@@+.*#%
-@@@@+=*@@%*@@@@@@@@@@@@@@@@@@@@@@@@@@@+.-@*
-@@@-##@@@%+@@@@@@@@@@@@@@@@@@@@@@@@@@@=:%@+
-@*:=@@@@@%+@@@@@@@@@@@@@@@@@@@@@@@@@@%-+@%:
-""")
-
-# Psila,psila,ta maura ta mpere,den ta,den ta,den ta nikoun pote!
-# 2023 E' ESSO
 
 # Function to generate a random password
 def generate_password():
@@ -112,7 +88,7 @@ def add_data():
     conn.execute("INSERT INTO data (content) VALUES (?)", (data,))
     conn.commit()
     conn.close()
-    print("Data added successfully.")
+    logging.info("Data added successfully.")
 
 def edit_data():
     """Edit existing data in the database."""
@@ -121,7 +97,7 @@ def edit_data():
     results = conn.execute("SELECT id, content FROM data WHERE content LIKE ?", ('%' + search_term + '%',)).fetchall()
 
     if not results:
-        print("No matching data found.")
+        logging.info("No matching data found.")
         return
     
     for row in results:
@@ -132,7 +108,7 @@ def edit_data():
     conn.execute("UPDATE data SET content = ? WHERE id = ?", (new_content, data_id))
     conn.commit()
     conn.close()
-    print("Data edited successfully.")
+    logging.info("Data edited successfully.")
 
 def search_data():
     """Search for data in the database."""
@@ -142,9 +118,9 @@ def search_data():
     conn.close()
 
     if not results:
-        print("No matching data found.")
+        logging.info("No matching data found.")
     else:
-        print("Matching data:")
+        logging.info("Matching data:")
         for row in results:
             print(row[0])
 
@@ -155,7 +131,7 @@ def see_database():
     conn.close()
 
     if not data:
-        print("The database is empty.")
+        logging.info("The database is empty.")
     else:
         for row in data:
             print(row[0])
@@ -163,37 +139,36 @@ def see_database():
 def database_menu():
     """Display the database menu and handle user input."""
     while True:
-        display_ascii_art()
         print("\n1) Add Data")
         print("2) Edit Data")
         print("3) Search Data")
         print("4) See Database")
         print("5) Return to Main Menu\n")
-        
-        print("Psila,psila,ta maura ta mpere,den ta,den ta,den ta nikoun pote!\n2023 E' ESSO\n")
 
         option = input("Choose an option: ")
 
-        if option == '1':
-            add_data()
-        elif option == '2':
-            edit_data()
-        elif option == '3':
-            search_data()
-        elif option == '4':
-            see_database()
-        elif option == '5':
-            break
-        else:
-            print("Invalid option. Please try again.")
+        match option:
+            case '1':
+                add_data()
+            case '2':
+                edit_data()
+            case '3':
+                search_data()
+            case '4':
+                see_database()
+            case '5':
+                break
+            case _:
+                logging.info("Invalid option. Please try again.")
 
 # Automate package installation and setup
 def install_packages():
     """Install required Python packages."""
     try:
-        subprocess.run(["pip", "install", "--upgrade", "Flask", "bcrypt", "cryptography"], check=True)
+        subprocess.run(["pip", "install", "--upgrade", "Flask", "bcrypt", "cryptography"], check=True, capture_output=True, text=True)
+        logging.info("Packages installed successfully.")
     except subprocess.CalledProcessError as e:
-        print(f"Failed to install packages: {e}. Please install them manually.")
+        logging.error(f"Failed to install packages: {e.stderr}. Please install them manually.")
         sys.exit(1)
 
 try:
@@ -307,20 +282,20 @@ def stop_flask_server(force=False):
         pids = subprocess.check_output(pgrep_command, shell=True).decode().strip().split()
 
         if not pids:
-            print("No Flask server is currently running.")
+            logging.info("No Flask server is currently running.")
             return
 
         for pid in pids:
             if force:
-                print(f"Forcefully stopping Flask server with PID: {pid}")
+                logging.info(f"Forcefully stopping Flask server with PID: {pid}")
                 subprocess.run(f"kill -9 {pid}", shell=True, check=True)
             else:
-                print(f"Stopping Flask server with PID: {pid}")
+                logging.info(f"Stopping Flask server with PID: {pid}")
                 subprocess.run(f"kill {pid}", shell=True, check=True)
 
-        print("Flask server(s) stopped.")
+        logging.info("Flask server(s) stopped.")
     except subprocess.CalledProcessError as e:
-        print(f"Error stopping Flask server: {e}")
+        logging.error(f"Error stopping Flask server: {e}")
 
 # Main Menu
 def main_menu():
@@ -329,45 +304,42 @@ def main_menu():
     app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
     while True:
-        display_ascii_art()
         print("\n1) Database Operations")
         print("2) Run Local Server")
         print("3) Generate Password")
         print("4) Encrypt Text")
         print("5) Decrypt Text")
         print("6) Quit\n")
-        
-        print("Psila,psila,ta maura ta mpere,den ta,den ta,den ta nikoun pote!\n2023 E' ESSO\n")
 
         option = input("Choose an option: ")
 
-        if option == '1':
-            database_menu()
-        elif option == '2':
-            local_server_menu()
-        elif option == '3':
-            print("Generated password:", generate_password())
-        elif option == '4':
-            text = input("Enter text to encrypt: ")
-            password = input("Enter password: ")
-            print("Encrypted text:", encrypt_text(text, password))
-        elif option == '5':
-            encrypted_text = input("Enter text to decrypt: ")
-            password = input("Enter password: ")
-            try:
-                print("Decrypted text:", decrypt_text(encrypted_text, password))
-            except Exception as e:
-                print("Decryption failed:", e)
-        elif option == '6':
-            print("Exiting...")
-            sys.exit(0)
-        else:
-            print("Invalid option. Please try again.")
+        match option:
+            case '1':
+                database_menu()
+            case '2':
+                local_server_menu()
+            case '3':
+                logging.info("Generated password: %s", generate_password())
+            case '4':
+                text = input("Enter text to encrypt: ")
+                password = input("Enter password: ")
+                logging.info("Encrypted text: %s", encrypt_text(text, password))
+            case '5':
+                encrypted_text = input("Enter text to decrypt: ")
+                password = input("Enter password: ")
+                try:
+                    logging.info("Decrypted text: %s", decrypt_text(encrypted_text, password))
+                except Exception as e:
+                    logging.error("Decryption failed: %s", e)
+            case '6':
+                logging.info("Exiting...")
+                sys.exit(0)
+            case _:
+                logging.info("Invalid option. Please try again.")
 
 def local_server_menu():
     """Display the local server menu and handle user input."""
     while True:
-        display_ascii_art()
         print("\n1) Start Local Server")
         print("2) Stop Local Server Gracefully")
         print("3) Force Stop Local Server")
@@ -375,20 +347,20 @@ def local_server_menu():
 
         option = input("Choose an option: ")
 
-        if option == '1':
-            print("Starting Flask server...")
-            app.run(host='0.0.0.0', port=5000)
-        elif option == '2':
-            print("Stopping Flask server gracefully...")
-            stop_flask_server(force=False)
-        elif option == '3':
-            print("Force stopping Flask server...")
-            stop_flask_server(force=True)
-        elif option == '4':
-            break
-        else:
-            print("Invalid option. Please try again.")
+        match option:
+            case '1':
+                logging.info("Starting Flask server...")
+                app.run(host='0.0.0.0', port=5000)
+            case '2':
+                logging.info("Stopping Flask server gracefully...")
+                stop_flask_server(force=False)
+            case '3':
+                logging.info("Force stopping Flask server...")
+                stop_flask_server(force=True)
+            case '4':
+                break
+            case _:
+                logging.info("Invalid option. Please try again.")
 
 if __name__ == "__main__":
     main_menu()
-
