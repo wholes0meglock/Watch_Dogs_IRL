@@ -4,8 +4,17 @@ import zlib
 import argparse
 import subprocess
 import sys
-import tqdm
+import logging
+import shutil
 from pathlib import Path
+from concurrent.futures import ThreadPoolExecutor
+import tqdm
+
+# Configure logging to print to STDOUT
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+console_handler = logging.StreamHandler(sys.stdout)
+console_handler.setLevel(logging.INFO)
+logging.getLogger().addHandler(console_handler)
 
 # Ensure required packages are installed
 def install_packages():
@@ -14,7 +23,7 @@ def install_packages():
         try:
             __import__(package)
         except ImportError:
-            print(f"Installing {package}...")
+            logging.info(f"Installing {package}...")
             subprocess.check_call([sys.executable, '-m', 'pip', 'install', package])
 
 def compress_file(file_path, compression_level=9):
@@ -24,14 +33,14 @@ def compress_file(file_path, compression_level=9):
         with open(file_path, 'rb') as f_in:
             with gzip.open(compressed_path, 'wb', compresslevel=compression_level) as f_out:
                 shutil.copyfileobj(f_in, f_out)
-        print(f"Compressed {file_path} to {compressed_path}")
+        logging.info(f"Compressed {file_path} to {compressed_path}")
     except Exception as e:
-        print(f"Error compressing {file_path}: {e}")
+        logging.error(f"Error compressing {file_path}: {e}")
 
 def decompress_file(file_path):
     """Decompress a single file using gzip."""
     if not file_path.endswith('.gz'):
-        print(f"Skipping {file_path}: Not a gzip file.")
+        logging.warning(f"Skipping {file_path}: Not a gzip file.")
         return
     
     decompressed_path = file_path[:-3]
@@ -39,32 +48,45 @@ def decompress_file(file_path):
         with gzip.open(file_path, 'rb') as f_in:
             with open(decompressed_path, 'wb') as f_out:
                 shutil.copyfileobj(f_in, f_out)
-        print(f"Decompressed {file_path} to {decompressed_path}")
+        logging.info(f"Decompressed {file_path} to {decompressed_path}")
     except Exception as e:
-        print(f"Error decompressing {file_path}: {e}")
+        logging.error(f"Error decompressing {file_path}: {e}")
+
+def process_file(file_path, action, compression_level):
+    match action:
+        case 'compress':
+            compress_file(file_path, compression_level)
+        case 'decompress':
+            decompress_file(file_path)
+        case _:
+            logging.error("Unsupported action. Please use 'compress' or 'decompress'.")
 
 def process_directory(base_path, action, ignore_patterns, compression_level):
     if not os.path.isdir(base_path):
-        print(f"Error: {base_path} is not a valid directory.")
+        logging.error(f"Error: {base_path} is not a valid directory.")
         return
 
     ignore_patterns = [Path(p) for p in ignore_patterns]
+    
+    # Use dynamic thread count based on system capabilities
+    max_workers = os.cpu_count() or 1
 
-    for root, _, files in os.walk(base_path):
-        for file in tqdm.tqdm(files, desc=f"{action.capitalize()}ing", unit="file"):
-            file_path = os.path.join(root, file)
-            if any(Path(file).match(p) for p in ignore_patterns):
-                continue
-            
-            if action == 'compress':
-                compress_file(file_path, compression_level)
-            elif action == 'decompress':
-                decompress_file(file_path)
-            else:
-                print("Unsupported action. Please use 'compress' or 'decompress'.")
-                return
-
-    print(f'{action.capitalize()}ion completed for directory: {base_path}')
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = []
+        for root, _, files in os.walk(base_path):
+            for file in files:
+                file_path = os.path.join(root, file)
+                if any(Path(file).match(p) for p in ignore_patterns):
+                    continue
+                futures.append(executor.submit(process_file, file_path, action, compression_level))
+        
+        for future in tqdm.tqdm(futures, desc=f"{action.capitalize()}ing", unit="file"):
+            try:
+                future.result()
+            except Exception as e:
+                logging.error(f"Error processing file: {e}")
+    
+    logging.info(f'{action.capitalize()}ion completed for directory: {base_path}')
 
 def main():
     install_packages()
@@ -77,11 +99,8 @@ def main():
                         help='Compression level for gzip (1-9, default is 9)')
     args = parser.parse_args()
 
-    if args.action == 'compress' and args.compression_level not in range(1, 10):
-        print("Error: Compression level must be between 1 and 9.")
-        return
-
     process_directory(args.path, args.action, args.ignore, args.compression_level)
 
 if __name__ == '__main__':
     main()
+        
