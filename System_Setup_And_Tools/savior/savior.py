@@ -5,13 +5,23 @@ import threading
 import logging
 import shutil
 import time
+import multiprocessing
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from pathlib import Path
 
 # Setup logging
-logging.basicConfig(filename='/data/data/com.termux/files/home/savior.log', level=logging.INFO,
-                    format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(
+    filename='/data/data/com.termux/files/home/savior.log',
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
+
+# Add a handler to also log to STDOUT
+console_handler = logging.StreamHandler()
+console_handler.setLevel(logging.INFO)
+console_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
+logging.getLogger().addHandler(console_handler)
 
 # Request storage permissions
 def request_storage_permissions():
@@ -66,80 +76,75 @@ def backup_file(file_path, backup_dir='/data/data/com.termux/files/home/savior_b
 def manage_backups(action, backup_dir='/data/data/com.termux/files/home/savior_backups'):
     backup_files = [f for f in os.listdir(backup_dir) if os.path.isfile(os.path.join(backup_dir, f))]
     
-    if action == 'restore':
-        if not backup_files:
-            print("No backups available to restore.")
-            logging.info("No backups available to restore.")
-            return
-        latest_backup = max(backup_files, key=lambda x: os.path.getmtime(os.path.join(backup_dir, x)))
-        original_file = os.path.join('/data/data/com.termux/files/home', os.path.basename(latest_backup))
-        shutil.copy2(os.path.join(backup_dir, latest_backup), original_file)
-        print(f"Restored {original_file} from backup.")
-        logging.info(f"Restored {original_file} from backup.")
-    elif action == 'delete':
-        for backup_file in backup_files:
-            os.remove(os.path.join(backup_dir, backup_file))
-            logging.info(f"Deleted backup: {backup_file}")
-        print("All old backups deleted.")
-    else:
-        print("Invalid backup action.")
-        logging.error("Invalid backup action specified.")
+    match action:
+        case 'restore':
+            if not backup_files:
+                logging.info("No backups available to restore.")
+                return
+            latest_backup = max(backup_files, key=lambda x: os.path.getmtime(os.path.join(backup_dir, x)))
+            original_file = os.path.join('/data/data/com.termux/files/home', os.path.basename(latest_backup))
+            shutil.copy2(os.path.join(backup_dir, latest_backup), original_file)
+            logging.info(f"Restored {original_file} from backup.")
+        case 'delete':
+            for backup_file in backup_files:
+                os.remove(os.path.join(backup_dir, backup_file))
+                logging.info(f"Deleted backup: {backup_file}")
+        case _:
+            logging.error("Invalid backup action specified.")
 
 # Auto-download and install required tools
 def setup_environment():
-    # List of essential tools and packages
     essential_packages = ['git', 'python', 'curl', 'shellcheck']
     
     # Install missing apt packages
     for package in essential_packages:
         try:
-            subprocess.run(['apt', 'install', '-y', package], check=True)
+            subprocess.run(['apt', 'install', '-y', package], check=True, capture_output=True, text=True)
             logging.info(f"{package} installed successfully.")
-        except subprocess.CalledProcessError:
-            logging.error(f"Failed to install {package} via apt.")
+        except subprocess.CalledProcessError as e:
+            logging.error(f"Failed to install {package} via apt: {e.stderr}")
 
     # Ensure pip is installed and up-to-date
     try:
-        subprocess.run(['apt', 'install', '-y', 'python-pip'], check=True)
+        subprocess.run(['apt', 'install', '-y', 'python-pip'], check=True, capture_output=True, text=True)
         logging.info("pip installed successfully.")
-    except subprocess.CalledProcessError:
-        logging.error("Failed to install pip via apt.")
+    except subprocess.CalledProcessError as e:
+        logging.error(f"Failed to install pip via apt: {e.stderr}")
 
     # Pip packages to install
     pip_packages = ['autopep8', 'black', 'pyflakes']
     for package in pip_packages:
         try:
-            subprocess.run(['pip', 'install', '--upgrade', package], check=True)
+            subprocess.run(['pip', 'install', '--upgrade', package], check=True, capture_output=True, text=True)
             logging.info(f"{package} installed/updated successfully via pip.")
-        except subprocess.CalledProcessError:
-            logging.error(f"Failed to install/update {package} via pip.")
+        except subprocess.CalledProcessError as e:
+            logging.error(f"Failed to install/update {package} via pip: {e.stderr}")
 
 # Fix Python files with AI assistance
 def fix_python_file(file_path):
     try:
-        subprocess.run(['python', '-m', 'py_compile', file_path], check=True)
+        subprocess.run(['python', '-m', 'py_compile', file_path], check=True, capture_output=True, text=True)
         logging.info(f"{file_path} compiled successfully.")
     except subprocess.CalledProcessError:
         logging.warning(f"{file_path} has syntax errors! Attempting to fix...")
-        # AI-based syntax correction using autopep8
-        subprocess.run(['autopep8', '--in-place', '--aggressive', '--aggressive', file_path])
+        subprocess.run(['autopep8', '--in-place', '--aggressive', '--aggressive', file_path], capture_output=True, text=True)
         logging.info(f"Auto-fixed Python syntax for {file_path}.")
         try:
-            subprocess.run(['python', '-m', 'py_compile', file_path], check=True)
+            subprocess.run(['python', '-m', 'py_compile', file_path], check=True, capture_output=True, text=True)
         except subprocess.CalledProcessError:
             logging.error(f"Could not automatically fix {file_path}. Manual intervention needed.")
 
 # Fix Bash scripts with AI assistance
 def fix_bash_file(file_path):
     try:
-        subprocess.run(['bash', '-n', file_path], check=True)
+        subprocess.run(['bash', '-n', file_path], check=True, capture_output=True, text=True)
         logging.info(f"{file_path} passed Bash syntax check.")
     except subprocess.CalledProcessError:
         logging.warning(f"{file_path} has syntax errors! Attempting to fix...")
-        subprocess.run(['shellcheck', '--shell=bash', '--format=gcc', file_path], check=True)
+        subprocess.run(['shellcheck', '--shell=bash', '--format=gcc', file_path], check=True, capture_output=True, text=True)
         logging.info(f"Auto-fixed Bash syntax for {file_path}.")
         try:
-            subprocess.run(['bash', '-n', file_path], check=True)
+            subprocess.run(['bash', '-n', file_path], check=True, capture_output=True, text=True)
         except subprocess.CalledProcessError:
             logging.error(f"Could not automatically fix {file_path}. Manual intervention needed.")
 
@@ -151,16 +156,15 @@ def scan_and_fix_directory(directory, checksums):
             if is_file_corrupted(file_path, checksums):
                 logging.warning(f"Corrupted file found: {file_path}")
                 backup_file(file_path)
-                # Logic to fix or replace the corrupted file can go here
             if file_name.endswith(".py"):
                 fix_python_file(file_path)
             elif file_name.endswith(".sh"):
                 fix_bash_file(file_path)
-            # Additional checks for other file types can be added here
 
 # Parallelize the scanning process
 def parallel_scan(base_dir, checksums):
-    with ThreadPoolExecutor(max_workers=10) as executor:
+    num_threads = multiprocessing.cpu_count()
+    with ThreadPoolExecutor(max_workers=num_threads) as executor:
         dirs = [os.path.join(base_dir, d) for d in os.listdir(base_dir) if os.path.isdir(os.path.join(base_dir, d))]
         dirs.append(base_dir)
         executor.map(lambda d: scan_and_fix_directory(d, checksums), dirs)
@@ -168,9 +172,11 @@ def parallel_scan(base_dir, checksums):
 # Self-update functionality
 def self_update():
     repo_url = "https://github.com/dedsec1121fk/Nothing"  # Replace with your actual repo URL
-    subprocess.run(['git', 'pull', repo_url], check=True)
-    print("Savior updated successfully.")
-    logging.info("Savior updated successfully.")
+    result = subprocess.run(['git', 'pull', repo_url], capture_output=True, text=True)
+    if result.returncode == 0:
+        logging.info("Savior updated successfully.")
+    else:
+        logging.error(f"Failed to update Savior: {result.stderr}")
 
 # Main menu for user interaction
 def main_menu():
@@ -182,59 +188,45 @@ def main_menu():
         print("4. Exit")
         choice = input("Choose an option: ")
 
-        if choice == '1':
-            # Load checksums and start scanning
-            print("Scanning and fixing system files...")
-            logging.info("Started scanning and fixing system files.")
-            checksums = load_checksums()
-            parallel_scan('/data/data/com.termux/files/home', checksums)
-            print("Scan completed.")
-            logging.info("Scan completed.")
-        
-        elif choice == '2':
-            print("Backup Management:")
-            print("1. Backup current state")
-            print("2. Restore from backup")
-            print("3. Delete old backups")
-            backup_choice = input("Choose an option: ")
-            
-            if backup_choice == '1':
-                print("Creating backup...")
-                logging.info("Creating backup of all system files.")
+        match choice:
+            case '1':
+                logging.info("Started scanning and fixing system files.")
                 checksums = load_checksums()
                 parallel_scan('/data/data/com.termux/files/home', checksums)
-                print("Backup completed.")
-                logging.info("Backup completed.")
-            elif backup_choice == '2':
-                # Restore from the latest backup
-                manage_backups('restore')
-            elif backup_choice == '3':
-                # Delete old backups
-                manage_backups('delete')
-            else:
-                print("Invalid choice.")
-        
-        elif choice == '3':
-            # Self-update
-            self_update()
+                logging.info("Scan completed.")
+            case '2':
+                print("Backup Management:")
+                print("1. Backup current state")
+                print("2. Restore from backup")
+                print("3. Delete old backups")
+                backup_choice = input("Choose an option: ")
 
-        elif choice == '4':
-            print("Exiting Savior...")
-            break
-
-        else:
-            print("Invalid choice. Please try again.")
+                match backup_choice:
+                    case '1':
+                        logging.info("Creating backup of all system files.")
+                        checksums = load_checksums()
+                        parallel_scan('/data/data/com.termux/files/home', checksums)
+                        logging.info("Backup completed.")
+                    case '2':
+                        manage_backups('restore')
+                    case '3':
+                        manage_backups('delete')
+                    case _:
+                        logging.error("Invalid backup choice.")
+            case '3':
+                self_update()
+            case '4':
+                logging.info("Exiting Savior.")
+                break
+            case _:
+                logging.error("Invalid choice. Please try again.")
 
 # Main function to start the program
 def main():
-    # Request storage permissions
     request_storage_permissions()
-
-    # Setup the environment
     setup_environment()
-
-    # Display the menu
     main_menu()
 
 if __name__ == "__main__":
     main()
+  
